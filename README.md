@@ -1,3 +1,5 @@
+![Banner](banner.png)
+
 # misconfig-ConfigPropertyCrossValidator
 Validates configuration properties against a known matrix of compatible values, identifying configurations that are likely to cause incompatibility issues. This helps to avoid problems during system upgrades or migrations. - Focused on Check for misconfigurations in configuration files or infrastructure definitions
 
