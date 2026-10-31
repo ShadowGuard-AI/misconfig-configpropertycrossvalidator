@@ -65,6 +65,11 @@ def load_compatibility_matrix(matrix_file):
             except json.JSONDecodeError as e:
                 raise ConfigError(f"Error decoding JSON in compatibility matrix file: {matrix_file}. {e}") from e
 
+        if not isinstance(matrix_data, dict) or not matrix_data:
+            raise ConfigError("Compatibility matrix is empty or is not a mapping: no properties would be checked.")
+        for property_name, expected_values in matrix_data.items():
+            if not isinstance(expected_values, (list, tuple)):
+                raise ConfigError(f"Compatibility matrix entry for property '{property_name}' must be a JSON array of allowed values, got: {expected_values!r}")
         return matrix_data
     except FileNotFoundError:
          raise ConfigError(f"Compatibility matrix file not found: {matrix_file}")
@@ -77,8 +82,11 @@ def load_compatibility_matrix(matrix_file):
 def validate_config(config_data, compatibility_matrix):
     """Validates the configuration data against the compatibility matrix."""
     issues = []
-
+    if not isinstance(compatibility_matrix, dict) or not compatibility_matrix:
+        raise ConfigError("Compatibility matrix is empty or is not a mapping: no properties would be checked.")
     for property_name, expected_values in compatibility_matrix.items():
+        if not isinstance(expected_values, (list, tuple)):
+            raise ConfigError(f"Compatibility matrix entry for property '{property_name}' must be a list of allowed values.")
         if property_name in config_data:
             actual_value = config_data[property_name]
             if actual_value not in expected_values:
