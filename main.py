@@ -66,6 +66,11 @@ def load_compatibility_matrix(matrix_file):
                 raise ConfigError(f"Error decoding JSON in compatibility matrix file: {matrix_file}. {e}") from e
 
         if not isinstance(matrix_data, dict) or not matrix_data:
+            # The matrix is validated here in the loader and then again,
+            # nearly line for line, at the top of validate_config. The
+            # duplication guards library callers who skip the loader,
+            # at the price of two places that can disagree about what a
+            # valid matrix is.
             raise ConfigError("Compatibility matrix is empty or is not a mapping: no properties would be checked.")
         for property_name, expected_values in matrix_data.items():
             if not isinstance(expected_values, (list, tuple)):
@@ -87,12 +92,27 @@ def validate_config(config_data, compatibility_matrix):
     for property_name, expected_values in compatibility_matrix.items():
         if not isinstance(expected_values, (list, tuple)):
             raise ConfigError(f"Compatibility matrix entry for property '{property_name}' must be a list of allowed values.")
+        # Only the top level is ever consulted. A property the matrix
+        # names inside a nested section is reported missing here even
+        # when it sits one level down in the file, because I never
+        # descend. The same test does stranger work when the config
+        # parsed to a string: in becomes a substring test against the
+        # document's text, and the run can pass or fail on that.
         if property_name in config_data:
             actual_value = config_data[property_name]
+            # Membership here is Python equality, with its usual blending:
+            # the number 1 in a config counts as the boolean true in a
+            # matrix, while the string 1 counts as neither. YAML and JSON
+            # spell these values differently, so the same setting can pass
+            # from one format and fail from the other.
             if actual_value not in expected_values:
                 issues.append(f"Property '{property_name}' has incompatible value '{actual_value}'. Allowed values: {expected_values}")
                 logging.warning(f"Property '{property_name}' has incompatible value '{actual_value}'. Allowed values: {expected_values}")
         else:
+            # Missing and incompatible land in the same list with the same
+            # weight. A caller reading only the count cannot tell a file
+            # that lacks a property entirely from one that sets it to a
+            # value the matrix forbids.
             issues.append(f"Property '{property_name}' is missing from the configuration.")
             logging.warning(f"Property '{property_name}' is missing from the configuration.")
 
@@ -107,6 +127,10 @@ def main():
         if args.verbose:
             logging.getLogger().setLevel(logging.DEBUG)
             logging.debug("Verbose logging enabled.")
+        # The elif makes verbose win when both flags are passed, the
+        # opposite of my linter tool, where quiet is applied second.
+        # The debug line inside this branch is also suppressed by the
+        # level it sets, so quiet mode never announces itself.
         elif args.quiet:
             logging.getLogger().setLevel(logging.ERROR)
             logging.debug("Suppressing output except for errors.")
